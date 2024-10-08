@@ -6,10 +6,6 @@ from .models import Message, Chat
 from accounts.models import User
 from django.db.models import Q, F
 from .serializers import ConsumerMessageSerializer, MessageSerializer, ChatSerializer, group_messages_by_date
-import base64
-from django.core.files.base import ContentFile
-from django.core.files.storage import default_storage
-import uuid
 
 
 room_members = {}
@@ -34,7 +30,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         self.room_name,
                         self.channel_name
                     )
+
                     await self.accept()
+                    print('Room Name:', self.room_name)
 
                     if self.room_name in room_members:
                         room_members[self.room_name].add(self.channel_name)
@@ -89,7 +87,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if not message_data:
             return
         status = message_data.get('status', '')
-        # print('Message from client:', message_data)
+        print('Status:', status)
         if status == 'typing':
             try:
                 receiver = message_data.get('receiver', '')
@@ -133,6 +131,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             msg_type = message_data.get('type', '')
             try:
                 message = await self.create_message(sender, receiver, content, msg_type)
+                if not message:
+                    return
                 serailzed_message = ConsumerMessageSerializer(message)
 
                 await self.channel_layer.group_send(
@@ -180,8 +180,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         'message': message_data,
                     }
                 )
+        elif status == 'media_update':
+            if len(room_members[self.room_name]) == 2:
+                updated = await self.message_seen_update(message_data['message']['id'])
+                if updated:
+                    message_data['message']['is_seen'] = True
+                await self.channel_layer.group_send(
+                    self.room_name,
+                    {
+                        'type': 'chat_message',
+                        'message': {'status': 'msg', 'message': message_data['message']},
+                    }
+                )
 
     async def chat_message(self, event):
+        print('event>>>', event)
         await self.send(text_data=json.dumps({
             'message': event['message'],
         }))
@@ -207,23 +220,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def create_message(self, sender, receiver, content, msg_type):
         '''save new message into db'''
-        print('msg_type>>>', msg_type)
         chat = Chat.objects.filter(name=self.room_name).first()
         sender = User.objects.filter(username=sender).first()
         receiver = User.objects.filter(username=receiver).first()
+        message = None
         if msg_type == 'text':
             message = Message.objects.create(chat=chat, sender=sender, receiver=receiver, content=content, msg_type='Text')
-            if len(room_members[self.room_name]) == 2:
-                message.is_seen = True
-                message.save()
-            chat.last_message = message
-            chat.save()
-        elif msg_type == 'image':
-            format, imgstr = content.split(';base64,')
-            ext = format.split('/')[-1]
-            img_data = ContentFile(base64.b64decode(imgstr), name=f"{uuid.uuid4()}.{ext}")
-            image_path = default_storage.save(f'media/chats/{img_data.name}', img_data)
-            message = Message.objects.create(chat=chat, sender=sender, receiver=receiver, image=image_path, msg_type='Image')
             if len(room_members[self.room_name]) == 2:
                 message.is_seen = True
                 message.save()
@@ -250,6 +252,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         chats = Chat.objects.filter(name__contains=user).order_by(F('last_message__timestamp').desc(nulls_last=True))
         chat_serializer = ChatSerializer(chats, many=True, context={'user': user})
         return chat_serializer.data
+
+    @database_sync_to_async
+    def message_seen_update(self, msg_id):
+        '''Update message seen'''
+        message = Message.objects.filter(id=msg_id).first()
+        if message:
+            message.is_seen = True
+            message.save()
+            return True
 
     async def group_message(self, event):
         '''Temp handler for global consumer'''

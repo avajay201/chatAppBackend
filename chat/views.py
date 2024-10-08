@@ -6,6 +6,7 @@ from django.db.models import Q, F
 from .models import Chat, Message, BlockedUser
 from accounts.models import User
 from .serializers import ChatSerializer, MessageSerializer, group_messages_by_date
+from .utils import validate_image, validate_video
 
 
 class ChatView(APIView):
@@ -146,3 +147,44 @@ class BlockUser(APIView):
             if blocker:
                 blocker.delete()
         return Response(status=status.HTTP_200_OK)
+
+class MessageSend(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        print(request.data, '||', request.FILES, '||')
+        msg_type = request.data.get('type')
+        name = request.data.get('name')
+        file = request.FILES.get('file')
+
+        if not msg_type or not file or not name or msg_type not in ('image', 'video'):
+            return Response({'error': 'Invalid request!.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        chat_poss1 = name
+        chat_poss2 = name.split('__')[1] + '__' + name.split('__')[0]
+        chat = Chat.objects.filter(Q(name=chat_poss1) | Q(name=chat_poss2)).first()
+        if not chat:
+            return Response({'error': 'Invalid request!.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if msg_type == 'image':
+            result = validate_image(file)
+            if not result:
+                return Response({'error': 'Invalid or corrupted image file!'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            result = validate_video(file)
+            print('result>>>', result)
+            if not result:
+                return Response({'error': 'Invalid or corrupted video file!'}, status=status.HTTP_400_BAD_REQUEST)
+
+        receiver = chat.name.split('__')[1] if chat.name.split('__')[0] == request.user.username else chat.name.split('__')[0]
+        receiver = User.objects.filter(username=receiver).first()
+        if msg_type == 'image':
+            message = Message.objects.create(chat=chat, msg_type='Image', image=file, sender=request.user, receiver=receiver)
+        else:
+            message = Message.objects.create(chat=chat, msg_type='Video', video=file, sender=request.user, receiver=receiver)
+        chat.last_message = message
+        chat.save()
+        message_serializer = MessageSerializer(message)
+        message = group_messages_by_date([message_serializer.data])
+        message = message['Today'][0]
+        return Response(message, status=status.HTTP_201_CREATED)

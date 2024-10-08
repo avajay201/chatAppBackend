@@ -81,7 +81,7 @@ def format_message_time(timestamp, message_time=False, last_message_time=False):
 class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
-        fields = '__all__'
+        fields = ('content', 'id', 'image', 'is_seen', 'msg_type', 'receiver', 'sender', 'timestamp', 'video')
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -93,7 +93,7 @@ class MessageSerializer(serializers.ModelSerializer):
 class ConsumerMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
-        fields = '__all__'
+        fields = ('content', 'id', 'image', 'is_seen', 'msg_type', 'receiver', 'sender', 'timestamp', 'video')
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
