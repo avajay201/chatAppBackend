@@ -277,14 +277,23 @@ class GlobalConsumer(AsyncWebsocketConsumer):
         try:
             print('connecting...')
             authenticated = await self.authenticate(auth_token)
-            print('authenticated>>>', authenticated)
-            if authenticated and authenticated not in global_room_members.values():
+            print('authenticated>>>', authenticated, 'global_room_members??>>', global_room_members)
+            if authenticated:
+                # if user already exists in connections, remove that user's channel
+                exists_channels = list(global_room_members.values())
+                channel_index = exists_channels.index(authenticated) if authenticated in exists_channels else None
+                if channel_index is not None:
+                    channel = list(global_room_members.keys())[channel_index]
+                    del global_room_members[channel]
+
                 await self.channel_layer.group_add(
                     self.room_name,
                     self.channel_name
                 )
                 await self.accept()
+                
 
+                # add new channel in group
                 global_room_members[self.channel_name] = authenticated
 
                 await self.channel_layer.group_send(
@@ -307,7 +316,10 @@ class GlobalConsumer(AsyncWebsocketConsumer):
                 self.channel_name
             )
 
+            # remove this channel from group
             del global_room_members[self.channel_name]
+
+            # inform to group that a user is disconnected from this group
             if global_room_members:
                 await self.channel_layer.group_send(
                     self.room_name,
