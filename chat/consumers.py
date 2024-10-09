@@ -345,3 +345,76 @@ class GlobalConsumer(AsyncWebsocketConsumer):
 
 # def send_notification():
 #     '''Send chat message notification'''
+
+call_room_members = {}
+class CallConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        r_name = self.scope['url_route']['kwargs']['room_name']
+        auth_token = self.scope['url_route']['kwargs']['token']
+        if not r_name or not auth_token:
+            await self.close()
+        
+        try:
+            authenticated = await self.authenticate(auth_token)
+            if authenticated:
+                user1, user2 = r_name.split('__')
+                self.room_name = await self.users_exist(user1, user2)
+                if self.room_name and (self.room_name not in call_room_members or len(call_room_members[self.room_name]) < 2):
+                    await self.channel_layer.group_add(
+                        self.room_name,
+                        self.channel_name
+                    )
+                await self.accept()
+            else:
+                await self.close()
+        except Exception as er:
+            print('Error:', er)
+            await self.close()
+
+    async def disconnect(self, close_code):
+        if self.room_name:
+            await self.channel_layer.group_discard(
+                self.room_name,
+                self.channel_name
+            )
+            if len(call_room_members[self.room_name]) > 1:
+                call_room_members[self.room_name].discard(self.channel_name)
+            else:
+                del call_room_members[self.room_name]
+
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+
+        # Broadcast signaling messages to all clients in the room
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'call_message',
+                'message': data
+            }
+        )
+
+    async def call_message(self, event):
+        message = event['message']
+
+        # Send the signaling message to WebRTC peers
+        await self.send(text_data=json.dumps(message))
+
+    @database_sync_to_async
+    def authenticate(self, token):
+        try:
+            auth = JWTAuthentication()
+            validated_token = auth.get_validated_token(token)
+            user_id = validated_token['user_id']
+            user = User.objects.get(id=user_id)
+            return user.username
+        except Exception as err:
+            print('Error:', err)
+            return
+    
+    @database_sync_to_async
+    def users_exist(self, username1, username2):
+        users = User.objects.filter(username__in=[username1, username2]).count()
+        chat = Chat.objects.filter(Q(name=f'{username1}__{username2}') | Q(name=f'{username2}__{username1}')).first()
+        if users == 2 and chat:
+            return chat.name
