@@ -3,7 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Q, F
-from .models import Chat, Message, BlockedUser
+from .models import Chat, Message, BlockedUser, Report
 from accounts.models import User
 from .serializers import ChatSerializer, MessageSerializer, group_messages_by_date
 from .utils import validate_image, validate_video
@@ -188,3 +188,24 @@ class MessageSend(APIView):
         message = group_messages_by_date([message_serializer.data])
         message = message['Today'][0]
         return Response(message, status=status.HTTP_201_CREATED)
+
+class ReportUser(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        message = request.data.get('message')
+        reason = request.data.get('reason')
+        username = request.data.get('user')
+
+        if not reason:
+            return Response({'error': 'Invalid request!.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        user = User.objects.filter(username=username).first()
+        if not user:
+            return Response({'error': 'User not found!.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            Report.objects.create(user=request.user, reported_user=user, reason=reason, message=message)
+            return Response(status=status.HTTP_201_CREATED)
+        except:
+            return Response({'error': 'Invalid request!.'}, status=status.HTTP_400_BAD_REQUEST)

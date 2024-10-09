@@ -291,7 +291,6 @@ class GlobalConsumer(AsyncWebsocketConsumer):
                     self.channel_name
                 )
                 await self.accept()
-                
 
                 # add new channel in group
                 global_room_members[self.channel_name] = authenticated

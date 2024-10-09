@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import ChatView, MessageView, MessageSend, MessageDelete, ChatClear, BlockUser
+from .views import ChatView, MessageView, MessageSend, MessageDelete, ChatClear, BlockUser, ReportUser
 
 urlpatterns = [
     path('chats/', ChatView.as_view(), name='chats'),
@@ -8,4 +8,5 @@ urlpatterns = [
     path('message-delete/', MessageDelete.as_view(), name='message-delete'),
     path('clear-chat/', ChatClear.as_view(), name='clear-chat'),
     path('block-user/', BlockUser.as_view(), name='block-user'),
+    path('report-user/', ReportUser.as_view(), name='report-user'),
 ]

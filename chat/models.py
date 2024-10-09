@@ -37,3 +37,18 @@ class BlockedUser(models.Model):
 
     def __str__(self):
         return f'{self.user} blocked {self.blocked_user}'
+
+REASON_CHOICES = [
+    ('spam', 'Spam'),
+    ('harassment', 'Harassment'),
+    ('offensive', 'Offensive Content'),
+]
+class Report(models.Model):
+    user = models.ForeignKey(User, related_name='reports_made', on_delete=models.CASCADE)
+    reported_user = models.ForeignKey(User, related_name='reports_received', on_delete=models.CASCADE)
+    reason = models.CharField(max_length=50, choices=REASON_CHOICES)
+    message = models.TextField(blank=True, null=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.user} reported {self.reported_user} for {self.reason}'

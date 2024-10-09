@@ -1,10 +1,11 @@
-from collections import defaultdict
-from rest_framework import serializers
-from .models import Chat, Message, BlockedUser
 from accounts.models import User
+from collections import defaultdict
 from datetime import timedelta
+from django.db.models import Q
 from django.utils import timezone
+from .models import Chat, Message, BlockedUser
 import pytz
+from rest_framework import serializers
 
 
 class ChatSerializer(serializers.ModelSerializer):
@@ -32,6 +33,7 @@ class ChatSerializer(serializers.ModelSerializer):
         if last_message and last_message.deleted_by and last_message.deleted_by.username == current_user:
             last_message = Message.objects.filter(chat=instance).exclude(deleted_by__username=current_user).order_by('timestamp').last()
 
+        is_blocked = BlockedUser.objects.filter(Q(user__username=user) & Q(blocked_user__username=current_user) | Q(user__username=current_user) & Q(blocked_user__username=user)).first()
         blocked = BlockedUser.objects.filter(user__username=user, blocked_user__username=current_user).first()
         if blocked:
             profile_pic = None
@@ -45,7 +47,8 @@ class ChatSerializer(serializers.ModelSerializer):
         representation['msg_type'] = last_message.msg_type if last_message else None
         representation['unseen_msgs'] = unseen_msgs
         representation['is_typing'] = False
-        representation['is_blocked'] = True if blocked else False
+        representation['is_blocked'] = True if is_blocked else False
+        representation['blocked'] = True if blocked else False
         representation['last_message_time'] = format_message_time(last_message.timestamp, last_message_time=True) if last_message else None
 
         return representation
