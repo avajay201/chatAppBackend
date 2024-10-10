@@ -372,7 +372,7 @@ class CallConsumer(AsyncWebsocketConsumer):
             await self.close()
 
     async def disconnect(self, close_code):
-        if self.room_name:
+        if self.room_name and self.room_name in call_room_members:
             await self.channel_layer.group_discard(
                 self.room_name,
                 self.channel_name
@@ -383,22 +383,41 @@ class CallConsumer(AsyncWebsocketConsumer):
                 del call_room_members[self.room_name]
 
     async def receive(self, text_data):
-        data = json.loads(text_data)
+        receive_dict = json.loads(text_data)
+        action = receive_dict['action']
 
-        # Broadcast signaling messages to all clients in the room
+        if action == 'new-offer' or action == 'new-answer':
+            print("receive_dict['message']>>>", receive_dict)
+            receive_channel_name = receive_dict['message']['receive_channel_name']
+            receive_dict['message']['receive_channel_name'] = self.channel_name
+
+            await self.channel_layer.send(
+            receive_channel_name,
+                {
+                    'type': 'call_message',
+                    'receive_dict': receive_dict,
+                }
+            )
+
+            return
+
+        receive_dict['receive_channel_name'] = self.channel_name
+
         await self.channel_layer.group_send(
-            self.room_group_name,
+            self.room_name,
             {
                 'type': 'call_message',
-                'message': data
+                'receive_dict': receive_dict,
             }
         )
 
     async def call_message(self, event):
-        message = event['message']
+        receive_dict = event['receive_dict']
+        # print('Call msg received from client:', receive_dict)
 
-        # Send the signaling message to WebRTC peers
-        await self.send(text_data=json.dumps(message))
+        await self.send(text_data=json.dumps({
+            'message': receive_dict
+        }))
 
     @database_sync_to_async
     def authenticate(self, token):
