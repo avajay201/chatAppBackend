@@ -7,6 +7,8 @@ from .models import Chat, Message, BlockedUser, Report
 from accounts.models import User
 from .serializers import ChatSerializer, MessageSerializer, group_messages_by_date
 from .utils import validate_image, validate_video
+import requests
+from django.core.files.base import ContentFile
 
 
 class ChatView(APIView):
@@ -152,12 +154,16 @@ class MessageSend(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        print(request.data, '||', request.FILES, '||')
         msg_type = request.data.get('type')
         name = request.data.get('name')
         file = request.FILES.get('file')
+        gif_url = request.data.get('url')
 
-        if not msg_type or not file or not name or msg_type not in ('image', 'video'):
+        if msg_type != 'gif':
+            if not msg_type or not file or not name or msg_type not in ('image', 'video'):
+                return Response({'error': 'Invalid request!.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if msg_type == 'gif' and not gif_url:
             return Response({'error': 'Invalid request!.'}, status=status.HTTP_400_BAD_REQUEST)
 
         chat_poss1 = name
@@ -170,9 +176,8 @@ class MessageSend(APIView):
             result = validate_image(file)
             if not result:
                 return Response({'error': 'Invalid or corrupted image file!'}, status=status.HTTP_400_BAD_REQUEST)
-        else:
+        elif msg_type == 'video':
             result = validate_video(file)
-            print('result>>>', result)
             if not result:
                 return Response({'error': 'Invalid or corrupted video file!'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -180,8 +185,19 @@ class MessageSend(APIView):
         receiver = User.objects.filter(username=receiver).first()
         if msg_type == 'image':
             message = Message.objects.create(chat=chat, msg_type='Image', image=file, sender=request.user, receiver=receiver)
-        else:
+        elif msg_type == 'video':
             message = Message.objects.create(chat=chat, msg_type='Video', video=file, sender=request.user, receiver=receiver)
+        else:
+            try:
+                response = requests.get(gif_url)
+                response.raise_for_status()
+            except requests.exceptions.RequestException as e:
+                return Response({'error': 'Failed to download the GIF.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            gif_name = gif_url.split('/')[-1]
+            gif_content = ContentFile(response.content, name=gif_name)
+
+            message = Message.objects.create(chat=chat, msg_type='Image', image=gif_content, sender=request.user, receiver=receiver)
         chat.last_message = message
         chat.save()
         message_serializer = MessageSerializer(message)
