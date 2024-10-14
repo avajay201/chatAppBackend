@@ -6,6 +6,8 @@ from .models import Message, Chat
 from accounts.models import User
 from django.db.models import Q, F
 from .serializers import ConsumerMessageSerializer, MessageSerializer, ChatSerializer, group_messages_by_date
+from .utils import send_notification
+from django.utils import timezone
 
 
 room_members = {}
@@ -32,13 +34,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     )
 
                     await self.accept()
-                    print('Room Name:', self.room_name)
 
                     if self.room_name in room_members:
                         room_members[self.room_name].add(self.channel_name)
                     else:
                         room_members[self.room_name] = set([self.channel_name])
-                    messages = await self.update_messages(authenticated, user1, user2)
+                    messages = await self.update_messages(authenticated.username, user1, user2)
                     await self.channel_layer.group_send(
                         self.room_name,
                         {
@@ -64,10 +65,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.room_name,
                 self.channel_name
             )
-            if len(room_members[self.room_name]) > 1:
+            if self.room_name in room_members and len(room_members[self.room_name]) > 1:
                 room_members[self.room_name].discard(self.channel_name)
             else:
-                del room_members[self.room_name]
+                if self.room_name in room_members:
+                    del room_members[self.room_name]
             
             if self.room_name in room_members:
                 await self.channel_layer.group_send(
@@ -146,7 +148,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 print('Message save error:', err)
 
             if len(room_members[self.room_name]) == 1:
-                # send_notification()
                 chats = await self.user_chats(receiver)
                 try:
                     receiver_channel_index = list(global_room_members.values()).index(receiver)
@@ -194,7 +195,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 )
 
     async def chat_message(self, event):
-        print('event>>>', event)
         await self.send(text_data=json.dumps({
             'message': event['message'],
         }))
@@ -213,7 +213,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             validated_token = auth.get_validated_token(token)
             user_id = validated_token['user_id']
             user = User.objects.get(id=user_id)
-            return user.username
+            user.last_login = timezone.now()
+            user.save()
+            return user
         except:
             return
 
@@ -231,6 +233,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 message.save()
             chat.last_message = message
             chat.save()
+            send_notification(sender.username, receiver.email)
         return message
 
     @database_sync_to_async
@@ -277,7 +280,6 @@ class GlobalConsumer(AsyncWebsocketConsumer):
         try:
             print('connecting...')
             authenticated = await self.authenticate(auth_token)
-            print('authenticated>>>', authenticated, 'global_room_members??>>', global_room_members)
             if authenticated:
                 # if user already exists in connections, remove that user's channel
                 exists_channels = list(global_room_members.values())
@@ -343,9 +345,6 @@ class GlobalConsumer(AsyncWebsocketConsumer):
             print('Error:', err)
             return
 
-# def send_notification():
-#     '''Send chat message notification'''
-
 call_room_members = {}
 class CallConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -387,7 +386,6 @@ class CallConsumer(AsyncWebsocketConsumer):
         action = receive_dict['action']
 
         if action == 'new-offer' or action == 'new-answer':
-            print("receive_dict['message']>>>", receive_dict)
             receive_channel_name = receive_dict['message']['receive_channel_name']
             receive_dict['message']['receive_channel_name'] = self.channel_name
 

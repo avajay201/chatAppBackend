@@ -6,7 +6,7 @@ from django.db.models import Q, F
 from .models import Chat, Message, BlockedUser, Report
 from accounts.models import User
 from .serializers import ChatSerializer, MessageSerializer, group_messages_by_date
-from .utils import validate_image, validate_video
+from .utils import validate_image, validate_video, send_notification, time_since_last_login
 import requests
 from django.core.files.base import ContentFile
 
@@ -67,7 +67,8 @@ class MessageView(APIView):
         other_user = User.objects.filter(username=other_user).first()
         blocked = BlockedUser.objects.filter(user=other_user, blocked_user=request.user).first()
         other_blocked = BlockedUser.objects.filter(user=request.user, blocked_user=other_user).first()
-        profile_data = {'blocked': True if blocked else False, 'other_blocked': True if other_blocked else False, 'profile_picture': other_user.profile_picture.url if other_user.profile_picture else None}
+        last_seen = time_since_last_login(other_user.last_login)
+        profile_data = {'blocked': True if blocked else False, 'other_blocked': True if other_blocked else False, 'profile_picture': other_user.profile_picture.url if other_user.profile_picture else None, 'last_seen': last_seen}
         return Response({'messages': messages, 'profile': profile_data}, status=status.HTTP_200_OK)
 
 class MessageDelete(APIView):
@@ -203,6 +204,7 @@ class MessageSend(APIView):
         message_serializer = MessageSerializer(message)
         message = group_messages_by_date([message_serializer.data])
         message = message['Today'][0]
+        send_notification(request.user.username, receiver.email)
         return Response(message, status=status.HTTP_201_CREATED)
 
 class ReportUser(APIView):
