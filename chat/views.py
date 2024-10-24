@@ -3,9 +3,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Q, F
-from .models import Chat, Message, BlockedUser, Report
+from .models import Chat, Message, BlockedUser, Report, MessageNotification
 from accounts.models import User
-from .serializers import ChatSerializer, MessageSerializer, group_messages_by_date
+from .serializers import ChatSerializer, MessageSerializer, group_messages_by_date, MessageNotificationSerializer
 from .utils import validate_image, validate_video, send_notification, time_since_last_login
 import requests
 from django.core.files.base import ContentFile
@@ -202,10 +202,10 @@ class MessageSend(APIView):
         chat.last_message = message
         chat.save()
         message_serializer = MessageSerializer(message)
-        message = group_messages_by_date([message_serializer.data])
-        message = message['Today'][0]
-        send_notification(request.user.username, receiver.email)
-        return Response(message, status=status.HTTP_201_CREATED)
+        message_dict = group_messages_by_date([message_serializer.data])
+        message_dict = message_dict['Today'][0]
+        send_notification(message)
+        return Response(message_dict, status=status.HTTP_201_CREATED)
 
 class ReportUser(APIView):
     permission_classes = [IsAuthenticated]
@@ -227,3 +227,11 @@ class ReportUser(APIView):
             return Response(status=status.HTTP_201_CREATED)
         except:
             return Response({'error': 'Invalid request!.'}, status=status.HTTP_400_BAD_REQUEST)
+
+class Notifications(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        notifications = MessageNotification.objects.filter(receiver=request.user, read=False)
+        notifications_serializer = MessageNotificationSerializer(notifications, many=True)
+        return Response(notifications_serializer.data, status=status.HTTP_200_OK)

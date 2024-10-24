@@ -15,6 +15,7 @@ class User(AbstractUser):
     location = models.CharField(max_length=255, null=True, blank=True)
     bio = models.TextField(null=True, blank=True)
     online = models.BooleanField(default=False)
+    device_token = models.CharField(max_length=250, null=True, blank=True)
     
     def get_age(self):
         if not self.dob:

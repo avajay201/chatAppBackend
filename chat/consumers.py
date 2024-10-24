@@ -2,7 +2,7 @@ import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from rest_framework_simplejwt.authentication import JWTAuthentication
-from .models import Message, Chat
+from .models import Message, Chat, MessageNotification
 from accounts.models import User
 from django.db.models import Q, F
 from .serializers import ConsumerMessageSerializer, MessageSerializer, ChatSerializer, group_messages_by_date
@@ -146,8 +146,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 )
             except Exception as err:
                 print('Message save error:', err)
+                return
 
             if len(room_members[self.room_name]) == 1:
+                # send notification if receiver is not online with sender
+                await send_notification(message)
+
                 chats = await self.user_chats(receiver)
                 try:
                     receiver_channel_index = list(global_room_members.values()).index(receiver)
@@ -158,11 +162,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         self.channel_name
                     )
 
+                    notifications = await self.message_notifications(receiver)
+
                     await self.channel_layer.send(
                         receiver_channel,
                         {
                             'type': 'group_message',
-                            'message': {'status': 'msg', 'chats': chats},
+                            'message': {'status': 'msg', 'chats': chats, 'notifications': notifications},
                         }
                     )
 
@@ -172,6 +178,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     )
                 except Exception as er:
                     print('Error:', er)
+                    return
         elif status == 'block':
             if len(room_members[self.room_name]) == 2:
                 await self.channel_layer.group_send(
@@ -226,14 +233,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
         sender = User.objects.filter(username=sender).first()
         receiver = User.objects.filter(username=receiver).first()
         message = None
-        if msg_type == 'text':
-            message = Message.objects.create(chat=chat, sender=sender, receiver=receiver, content=content, msg_type='Text')
-            if len(room_members[self.room_name]) == 2:
-                message.is_seen = True
-                message.save()
-            chat.last_message = message
-            chat.save()
-            send_notification(sender.username, receiver.email)
+        message = Message.objects.create(chat=chat, sender=sender, receiver=receiver, content=content, msg_type='Text')
+        if len(room_members[self.room_name]) == 2:
+            message.is_seen = True
+            message.save()
+        chat.last_message = message
+        chat.save()
         return message
 
     @database_sync_to_async
@@ -242,6 +247,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         sender = username2 if auth_user == username1 else username1
         chat = Chat.objects.filter(name=self.room_name).first()
         messages = Message.objects.filter(sender__username=sender, receiver__username=auth_user, is_seen=False)
+        notifications = MessageNotification.objects.filter(
+            sender__username=sender,
+            receiver__username=auth_user
+        )
+        if notifications.exists():
+            notifications.update(read=True)
+
         if messages:
             messages.update(is_seen=True)
             messages = Message.objects.filter(chat=chat).order_by('timestamp')
@@ -268,6 +280,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def group_message(self, event):
         '''Temp handler for global consumer'''
 
+    @database_sync_to_async
+    def message_notifications(self, receiver):
+        '''Get unread message notifications'''
+        notifications = MessageNotification.objects.filter(receiver__username=receiver, read=False)
+        return notifications.count()
 
 global_room_members = {}
 class GlobalConsumer(AsyncWebsocketConsumer):

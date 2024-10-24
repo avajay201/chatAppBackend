@@ -3,7 +3,7 @@ from collections import defaultdict
 from datetime import timedelta
 from django.db.models import Q
 from django.utils import timezone
-from .models import Chat, Message, BlockedUser
+from .models import Chat, Message, BlockedUser, MessageNotification
 import pytz
 from rest_framework import serializers
 
@@ -115,3 +115,15 @@ def group_messages_by_date(messages):
         grouped_messages[date_key].append(message)
 
     return grouped_messages
+
+class MessageNotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MessageNotification
+        fields = '__all__'
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['sender'] = instance.sender.username
+        representation['receiver'] = instance.receiver.username
+        representation['timestamp'] = format_message_time(instance.timestamp, last_message_time=True)
+        return representation

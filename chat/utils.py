@@ -5,6 +5,9 @@ from django.core.mail import send_mail
 from threading import Thread
 from django.utils import timezone
 from datetime import timedelta
+import requests
+from .models import MessageNotification
+from asgiref.sync import sync_to_async
 
 
 def validate_image(file: UploadedFile):
@@ -23,7 +26,6 @@ def validate_video(file: UploadedFile):
     '''Validate that the video file is not corrupted.'''
     try:
         content_type = file.content_type
-        print('content_type>>>', content_type)
         if content_type not in ('video/mp4'):
             return
         probe = ffmpeg.probe(file.temporary_file_path())
@@ -33,7 +35,25 @@ def validate_video(file: UploadedFile):
     except Exception as err:
         print('Video validating error:', err)
 
-def send_notification(sender, receiver_email):
+def push_notify(message):
+    '''Send push notification'''
+    notification_url = 'https://exp.host/--/api/v2/push/send'
+    message = {
+        'to': message.receiver.device_token,
+        'sound': 'default',
+        'title': message.sender.username,
+        'body': message.content if message.msg_type == 'Text' else message.msg_type,
+        'data': {}
+    }
+    response = requests.post(notification_url, json=message)
+    if response.status_code == 200:
+        print('Push notification sent successfully!')
+    else:
+        print('Failed to send push notification:')
+        print('Response:', response.json())
+
+@sync_to_async
+def send_notification(user_message):
     '''
     Send chat message notification through email.
     
@@ -41,16 +61,29 @@ def send_notification(sender, receiver_email):
     sender (str): Username of the person who sent the message.
     receiver_email (str): Email of the receiver.
     '''
+    # Save notification
+    try:
+        MessageNotification.objects.create(sender=user_message.sender, receiver=user_message.receiver, message=user_message)
+    except:
+        pass
+
+    # send push notification
+    try:
+        Thread(target=push_notify, args=(user_message,)).start()
+    except:
+        pass
+
+    # send email notification
     subject = "You've Received a New Message on Metri Chat"
     message = f"""
     Hi there,
 
-    You have a new message from {sender} on Metri Chat. 
+    You have a new message from {user_message.sender.username} on Metri Chat. 
 
     Log in to your account to view and respond to the message. 
 
     Here’s what you can do:
-    - Continue your conversation with {sender}
+    - Continue your conversation with {user_message.sender.username}
     - Explore other messages and notifications
 
     Thank you for using Metri Chat! We hope you have a seamless and engaging communication experience.
@@ -61,7 +94,7 @@ def send_notification(sender, receiver_email):
     Note: Please do not reply to this email. This is an automated notification.
     """
     from_email = "Metribookshelf@gmail.com"
-    recipient_list = [receiver_email]
+    recipient_list = [user_message.receiver.email]
 
     def send_email():
         send_mail(subject, message, from_email, recipient_list)

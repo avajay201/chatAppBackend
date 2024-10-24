@@ -52,3 +52,10 @@ class Report(models.Model):
 
     def __str__(self):
         return f'{self.user} reported {self.reported_user} for {self.reason}'
+
+class MessageNotification(models.Model):
+    sender = models.ForeignKey(User, related_name='sent_notification', null=True, on_delete=models.SET_NULL)
+    receiver = models.ForeignKey(User, related_name='received_notification', null=True, on_delete=models.SET_NULL)
+    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name='message_notification')
+    read = models.BooleanField(default=False)
+    timestamp = models.DateTimeField(auto_now_add=True)
