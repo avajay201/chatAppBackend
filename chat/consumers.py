@@ -252,7 +252,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             receiver__username=auth_user
         )
         if notifications.exists():
-            notifications.update(read=True)
+            notifications.update(read=False)
 
         if messages:
             messages.update(is_seen=True)

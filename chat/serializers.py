@@ -42,6 +42,7 @@ class ChatSerializer(serializers.ModelSerializer):
 
         representation['id'] = instance.id
         representation['username'] = user.username
+        representation['user_id'] = user.id
         representation['profile_picture'] = profile_pic
         representation['last_message'] = last_message.content if last_message else None
         representation['msg_type'] = last_message.msg_type if last_message else None

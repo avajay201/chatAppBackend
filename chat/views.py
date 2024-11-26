@@ -68,7 +68,7 @@ class MessageView(APIView):
         blocked = BlockedUser.objects.filter(user=other_user, blocked_user=request.user).first()
         other_blocked = BlockedUser.objects.filter(user=request.user, blocked_user=other_user).first()
         last_seen = time_since_last_login(other_user.last_login)
-        profile_data = {'blocked': True if blocked else False, 'other_blocked': True if other_blocked else False, 'profile_picture': other_user.profile_picture.url if other_user.profile_picture else None, 'last_seen': last_seen}
+        profile_data = {'blocked': True if blocked else False, 'other_blocked': True if other_blocked else False, 'profile_picture': other_user.profile_picture.url if other_user.profile_picture else None, 'last_seen': last_seen, 'user_id': other_user.id}
         return Response({'messages': messages, 'profile': profile_data}, status=status.HTTP_200_OK)
 
 class MessageDelete(APIView):
@@ -232,6 +232,6 @@ class Notifications(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        notifications = MessageNotification.objects.filter(receiver=request.user, read=False)
+        notifications = MessageNotification.objects.filter(receiver=request.user)
         notifications_serializer = MessageNotificationSerializer(notifications, many=True)
         return Response(notifications_serializer.data, status=status.HTTP_200_OK)

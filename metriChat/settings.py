@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'accounts',
     'chat',
+    'calls',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
