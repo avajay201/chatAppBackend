@@ -452,3 +452,69 @@ class CallConsumer(AsyncWebsocketConsumer):
         chat = Chat.objects.filter(Q(name=f'{username1}__{username2}') | Q(name=f'{username2}__{username1}')).first()
         if users == 2 and chat:
             return chat.name
+
+
+call_rooms = {}
+class CallHandleConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.room_group_name = self.scope['url_route']['kwargs']['room_name']
+
+        # only 2 users allow
+        if self.room_group_name in call_rooms and len(call_rooms[self.room_group_name]) > 1:
+            self.close()
+
+        # Join the room group
+        await self.channel_layer.group_add(
+            self.room_group_name,
+            self.channel_name
+        )
+
+        if self.room_group_name not in call_rooms:
+            call_rooms[self.room_group_name] = [True]
+        else:
+            call_rooms[self.room_group_name].append(True)
+
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        if self.room_group_name in call_rooms and call_rooms[self.room_group_name]:
+            call_rooms[self.room_group_name].pop()
+            await self.send_message_to_group(len(call_rooms[self.room_group_name]))
+
+        await self.channel_layer.group_discard(
+            self.room_group_name,
+            self.channel_name
+        )
+
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        message = data.get('message')
+
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'chat_message',
+                'message': message
+            }
+        )
+
+    async def chat_message(self, event):
+        message = event['message']
+        await self.send(text_data=json.dumps({
+            'message': message
+        }))
+
+    async def send_message_to_group(self, count):
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                'type': 'update_member_count',
+                'count': count
+            }
+        )
+
+    async def update_member_count(self, event):
+        count = event['count']
+        await self.send(text_data=json.dumps({
+            'member_count': count
+        }))
