@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Success</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f9;
+        }
+
+        .container {
+            text-align: center;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .icon-container {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 20px;
+            background-color: #4caf50;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .checkmark {
+            width: 30px;
+            height: 15px;
+            border: 3px solid white;
+            border-top: none;
+            border-right: none;
+            transform: rotate(-45deg);
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        p {
+            font-size: 16px;
+            color: #666;
+        }
+
+        .loading-animation {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4caf50;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="success-message">
+            <div class="icon-container">
+                <div class="checkmark"></div>
+            </div>
+            <h1>Payment Successful!</h1>
+            <p>Thank you for your payment. You will be redirected to the home page in <span id="countdown">5</span>
+                seconds.</p>
+            <div class="loading-animation">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        let countdownElement = document.getElementById('countdown');
+        let countdown = 5;
+
+        const redirectToHome = () => {
+            // window.location.href = '/payment-success';
+        };
+
+        const startCountdown = () => {
+            const interval = setInterval(() => {
+                countdown -= 1;
+                countdownElement.textContent = countdown;
+                if (countdown === 0) {
+                    clearInterval(interval);
+                    redirectToHome();
+                }
+            }, 1000);
+        };
+
+        // Start the countdown
+        startCountdown();
+
+    </script>
+</body>
+
+</html>

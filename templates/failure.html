@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Failed</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f9;
+        }
+
+        .container {
+            text-align: center;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .icon-container {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 20px;
+            background-color: #f44336;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .crossmark {
+            width: 30px;
+            height: 30px;
+            background-color: white;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            transform: rotate(45deg);
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        p {
+            font-size: 16px;
+            color: #666;
+        }
+
+        .loading-animation {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #f44336;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="failure-message">
+            <div class="icon-container">
+                <div class="crossmark"></div>
+            </div>
+            <h1>Payment Failed</h1>
+            <p>Oops! Something went wrong with your payment. You will be redirected to the home page in <span
+                    id="countdown">5</span> seconds.</p>
+            <div class="loading-animation">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        let countdownElement = document.getElementById('countdown');
+        let countdown = 5;
+
+        const redirectToHome = () => {
+            // window.location.href = '/payment-failure';
+        };
+
+        const startCountdown = () => {
+            const interval = setInterval(() => {
+                countdown -= 1;
+                countdownElement.textContent = countdown;
+                if (countdown === 0) {
+                    clearInterval(interval);
+                    redirectToHome();
+                }
+            }, 1000);
+        };
+
+        // Start the countdown
+        startCountdown();
+
+    </script>
+</body>
+
+</html>

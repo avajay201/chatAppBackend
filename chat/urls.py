@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import ChatView, MessageView, MessageSend, MessageDelete, ChatClear, BlockUser, ReportUser, Notifications
+from .views import ChatView, MessageView, MessageSend, MessageDelete, ChatClear, BlockUser, ReportUser, Notifications, RoomCreate
 
 urlpatterns = [
     path('chats/', ChatView.as_view(), name='chats'),
@@ -10,4 +10,5 @@ urlpatterns = [
     path('block-user/', BlockUser.as_view(), name='block-user'),
     path('report-user/', ReportUser.as_view(), name='report-user'),
     path('notifications/', Notifications.as_view(), name='notifications'),
+    path('room-create/', RoomCreate.as_view(), name='room-create'),
 ]

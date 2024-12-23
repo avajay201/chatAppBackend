@@ -18,12 +18,16 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from .views import success_response, failure_response
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('payment-success/', success_response),
+    path('payment-failure/', failure_response),
     path('user/', include('accounts.urls')),
     path('chat/', include('chat.urls')),
     path('calls/', include('calls.urls')),
+    path('subscriptions/', include('subscriptions.urls')),
 ]
 
 if settings.DEBUG:

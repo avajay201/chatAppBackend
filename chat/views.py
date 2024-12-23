@@ -6,7 +6,7 @@ from django.db.models import Q, F
 from .models import Chat, Message, BlockedUser, Report, MessageNotification
 from accounts.models import User
 from .serializers import ChatSerializer, MessageSerializer, group_messages_by_date, MessageNotificationSerializer
-from .utils import validate_image, validate_video, send_notification, time_since_last_login
+from .utils import validate_image, validate_video, send_notification, time_since_last_login, msg_subscription_check
 import requests
 from django.core.files.base import ContentFile
 
@@ -155,6 +155,10 @@ class MessageSend(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        msg_enable = msg_subscription_check(request.user.username)
+        if not msg_enable:
+            return Response({'error': 'You have exceeded the message limit for your current subscription.'}, status=status.HTTP_400_BAD_REQUEST)
+
         msg_type = request.data.get('type')
         name = request.data.get('name')
         file = request.FILES.get('file')
@@ -235,3 +239,11 @@ class Notifications(APIView):
         notifications = MessageNotification.objects.filter(receiver=request.user)
         notifications_serializer = MessageNotificationSerializer(notifications, many=True)
         return Response(notifications_serializer.data, status=status.HTTP_200_OK)
+
+class RoomCreate(APIView):
+    def post(self, request):
+        room_name = request.data.get('name')
+        if room_name:
+            Chat.objects.create(name=room_name)
+            return Response(status=status.HTTP_200_OK)
+        return Response({'error': 'Room name is required!'}, status=status.HTTP_400_BAD_REQUEST)

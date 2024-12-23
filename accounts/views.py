@@ -15,6 +15,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         email = request.data.get("email")
         password = request.data.get("password")
+        device_token = request.data.get("device_token")
         
         user = User.objects.filter(Q(username=email) | Q(email=email)).first()
         if user and user.check_password(password):
@@ -26,6 +27,9 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             serializer = self.get_serializer(data=validated_data)
             serializer.is_valid(raise_exception=True)
             serializer.validated_data['username'] = user.username
+            if device_token:
+                user.device_token = device_token
+                user.save()
             return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
         return Response({"detail": "Invalid credentials"}, status=status.HTTP_400_BAD_REQUEST)
@@ -36,3 +40,8 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context

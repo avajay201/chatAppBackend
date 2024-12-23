@@ -6,7 +6,7 @@ from .models import Message, Chat, MessageNotification
 from accounts.models import User
 from django.db.models import Q, F
 from .serializers import ConsumerMessageSerializer, MessageSerializer, ChatSerializer, group_messages_by_date
-from .utils import send_notification
+from .utils import send_notification, msg_subscription_check
 from django.utils import timezone
 
 
@@ -134,6 +134,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
             try:
                 message = await self.create_message(sender, receiver, content, msg_type)
                 if not message:
+                    await self.channel_layer.group_send(
+                    self.room_name,
+                        {
+                            'type': 'chat_message',
+                            'message': {'status': 'subscription', 'message': 'You have exceeded the message limit for your current subscription.', 'sender': sender},
+                        }
+                    )
                     return
                 serailzed_message = ConsumerMessageSerializer(message)
 
@@ -229,6 +236,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def create_message(self, sender, receiver, content, msg_type):
         '''save new message into db'''
+        msg_enable = msg_subscription_check(sender)
+        if not msg_enable:
+            return
         chat = Chat.objects.filter(name=self.room_name).first()
         sender = User.objects.filter(username=sender).first()
         receiver = User.objects.filter(username=receiver).first()

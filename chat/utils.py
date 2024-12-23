@@ -8,6 +8,7 @@ from datetime import timedelta
 import requests
 from .models import MessageNotification
 from asgiref.sync import sync_to_async
+from subscriptions.models import UserSubscription
 
 
 def validate_image(file: UploadedFile):
@@ -130,3 +131,41 @@ def time_since_last_login(last_login):
     else:
         years = time_diff.days // 365
         return f"{years} year{'s' if years > 1 else ''} ago"
+
+
+def msg_subscription_check(user):
+    try:
+        current_subscription = UserSubscription.objects.filter(user__username=user, active=True).first()
+
+        if current_subscription:
+            subscription_start_date = current_subscription.created_at
+            subscription_duration = timedelta(days=current_subscription.subscription.time_period * 30)  # Convert months to days
+            expiry_date = subscription_start_date + subscription_duration
+
+            # Check if the subscription has expired
+            if timezone.now() > expiry_date:
+                # Deactivate the subscription
+                current_subscription.delete()
+
+                # Activate a new subscription if it exists
+                new_subscription = UserSubscription.objects.filter(user__username=user).first()
+                if new_subscription:
+                    new_subscription.active = True
+                    new_subscription.save()
+                    current_subscription = new_subscription
+                else:
+                    return
+
+        if not current_subscription:
+            return
+
+        if current_subscription.messages == 0:
+            return
+
+        if current_subscription.messages > 0:
+            current_subscription.messages -= 1
+            current_subscription.save()
+            return True
+    except Exception as er:
+        print('Error:', er)
+        return

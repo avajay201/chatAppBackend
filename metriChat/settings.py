@@ -47,7 +47,7 @@ INSTALLED_APPS = [
     'accounts',
     'chat',
     'calls',
-    'payments',
+    'subscriptions',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
@@ -73,7 +73,7 @@ ROOT_URLCONF = 'metriChat.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': ['templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
