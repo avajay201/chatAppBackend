@@ -9,7 +9,7 @@ class CallSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        representation['profile_picture'] = instance.caller.profile_picture.url if instance.caller.profile_picture else None
+        representation['profile_picture'] = instance.receiver.profile_picture.url if instance.receiver.profile_picture else None
         representation['caller'] = instance.caller.username
         representation['caller_id'] = instance.caller.id
         representation['receiver'] = instance.receiver.username
